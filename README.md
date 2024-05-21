@@ -20,4 +20,10 @@
 			
 		example: to run the code for dataset rottom using all the classifiers and with crossvalidation type:
 			python sentiment_analysis.py rottom all yes
+
 # ML-X-Sentiment-Analysis-Model
+
+# The Talented team 
+- Stephanie Nhi Le 
+- Isaac McConnell
+- Rim Nassiri
