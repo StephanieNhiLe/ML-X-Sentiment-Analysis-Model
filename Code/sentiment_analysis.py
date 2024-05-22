@@ -8,18 +8,22 @@
 
 import numpy as np
 import re
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import confusion_matrix
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegressionCV
-from sklearn.model_selection import KFold, train_test_split
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import KFold, train_test_split 
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer, PorterStemmer
 import argparse
 import os 
+from textblob import TextBlob
+from emoji import demojize
+import contractions
+from spellchecker import SpellChecker 
 
 # ------ Data Preprocessing -------
 nltk.download('punkt')
@@ -56,22 +60,14 @@ slang_dict = {
     "yolo": "you only live once"
 }
 
-# """"
-#     Function to preprocess the text data
-#     :parameter text
-#     :returns tokens
-# """
-# def preprocessing(text):
-#     # text = text.lower()
-#     text = ' '.join(slang_dict.get(word, word) for word in text.split()) #slangs
-#     text = re.sub(r"http\S+|www\S+|https\S+", '', text, flags=re.MULTILINE) #Urls
-#     text = text.encode('ascii', 'ignore').decode('ascii') #emojis
-#     tokens = word_tokenize(text)
-#     tokens = [token.lower() for token in tokens if token not in stopwords.words('english')]
-#     tokens = [lemmatizer.lemmatize(token) for token in tokens]
-#     tokens = [stemmer.stem(token) for token in tokens]
-#     return tokens
-#     # return " ".join(tokens)
+contractions_dict = {
+    "isn't": "is not",
+    "don't": "do not",
+    "aren't": "are not",
+    "can't": "cannot",
+    "couldn't": "could not",
+    "didn't": "did not"
+}
 
 # Variables Initialization
 vNegative, Negative, Positive, vPositive = [], [], [], []
@@ -142,8 +138,8 @@ def createDictionaryFromPolarity(affin_list):
         # score.append(int(word.split("\t")[1].split("\n")[0]))
         score.append(int(word.split("\t")[1].strip()))
 
-    print(f'Words: {words}\n')
-    print(f'Score: {score}')
+    # print(f'Words: {words}\n')
+    # print(f'Score: {score}')
 
     #Categorize words into different Categories
     for elem in range(len(words)):
@@ -156,10 +152,10 @@ def createDictionaryFromPolarity(affin_list):
         elif score[elem] in [4, 5]:
             vPositive.append(words[elem])
 
-    print(f'vNegative: {vNegative} \n')
-    print(f'Negative: {Negative} \n')
-    print(f'vPositive: {vPositive} \n')
-    print(f'Positive: {Positive}\n')
+    # print(f'vNegative: {vNegative} \n')
+    # print(f'Negative: {Negative} \n')
+    # print(f'vPositive: {vPositive} \n')
+    # print(f'Positive: {Positive}\n')
 
 """
     This function is used for preprocessing the data.
@@ -220,21 +216,27 @@ STEPH-NHI: Improved the data preprocessing function
 by using techniques like tokenization, stop words removal, stemming, and lemmatization, 
 inclduing handling emojis and slangs as they are common in tweets.
 '''
+spell = SpellChecker()
+
 def preprocessing(dataSet):
     processed_data = []
     for tweet in dataSet: 
         tweet = tweet.lower() 
         tweet = re.sub(r"http\S+|www\S+|https\S+", '', tweet, flags=re.MULTILINE) #Urls
-        tweet = tweet.encode('ascii', 'ignore').decode('ascii') #emojis
-        tweet = re.sub(r'#(\w+)', r'\1', tweet) #hashtags
+        tweet = re.sub(r'#(\w+)', r'\1', tweet) #hashtags 
+        # tweet = tweet.encode('ascii', 'ignore').decode('ascii') #emojis
+        tweet = demojize(tweet, delimiters=(" ", " ")) #emojis
+        # tweet = contractions.fix(tweet) #contractions
+        tweet = ' '.join(contractions_dict.get(word, word) for word in tweet.split()) 
         tweet = re.sub(r'\d+', '', tweet) #numeric terms
-        tweet = re.sub(r'[^\w\s]', '', tweet) #punctuations
-        tweet = re.sub(r'\s+', ' ', tweet).strip() #whitespace
+        tweet = re.sub(r'[^\w\s]', '', tweet) #punctuations 
+        tweet = tweet.strip() #whitespace
         tokens = word_tokenize(tweet) 
         tokens = [token for token in tokens if token not in stopwords.words('english')] 
-        tokens = [stemmer.stem(lemmatizer.lemmatize(token)) for token in tokens] 
+        tokens = [stemmer.stem(lemmatizer.lemmatize(token)) for token in tokens]  #stemming and lemmatization
         tokens = [slang_dict[token] if token in slang_dict else token for token in tokens]
         processed_data.append(" ".join(tokens))
+
     return processed_data
 
 """
@@ -374,6 +376,16 @@ def classify_maxEnt(train_X, train_Y, test_X):
     return yHat
 
 
+# Random Forest 
+def classify_random_forest(train_X, train_Y, test_X):
+    print("Classifying using Random Forest ...")
+    rf = RandomForestClassifier()
+    rf.fit(train_X, train_Y)
+    yHat = rf.predict(test_X)
+
+    return yHat
+
+
 #########FOR TEST DATA CLASSIFICATION########
 def classify_naive_bayes_twitter(train_X, train_Y, test_X, test_Y):
 
@@ -412,6 +424,18 @@ def classify_maxEnt_twitter(train_X, train_Y, test_X, test_Y):
     print("Accuracy: ", Accuracy)
     evaluate_classifier(conf_mat)
 
+def classify_random_forest_twitter(train_X, train_Y, test_X, test_Y):
+    
+    print("Classifying using Random Forest ...")
+    rf = RandomForestClassifier()
+    rf.fit(train_X, train_Y)
+    yHat = rf.predict(test_X)
+    conf_mat = confusion_matrix(test_Y,yHat)
+    print(conf_mat)
+    Accuracy = (sum(conf_mat.diagonal())) / np.sum(conf_mat)
+    print("Accuracy: ", Accuracy)
+    evaluate_classifier(conf_mat)
+
 """
     This function is used to Classify the Tweets from Twitter into its specific class
     Based on the Algorithm to classify
@@ -435,12 +459,15 @@ def classify_twitter_data(file_name):
         classify_naive_bayes_twitter(data_X, data_Y, data_X_test, data_Y_test)
         classify_svm_twitter(data_X, data_Y, data_X_test, data_Y_test)
         classify_maxEnt_twitter(data_X, data_Y, data_X_test, data_Y_test)
+        classify_random_forest_twitter(data_X, data_Y, data_X_test, data_Y_test)
     elif args.Algorithm == "gnb":
         classify_naive_bayes_twitter(data_X, data_Y, data_X_test, data_Y_test)
     elif args.Algorithm == "svm":
         classify_svm_twitter(data_X, data_Y, data_X_test, data_Y_test)
     elif args.Algorithm == "maxEnt":
         classify_maxEnt_twitter(data_X, data_Y, data_X_test, data_Y_test)
+    elif args.Algorithm == "rf":
+        classify_random_forest_twitter(data_X, data_Y, data_X_test, data_Y_test)
 
 
 """
@@ -490,20 +517,7 @@ if __name__ == "__main__":
     negative_data = open(dirPath+"/Data/rt-polarity-neg.txt").readlines()
     negative_data = preprocessing(negative_data)
     #print(negative_data)
-
-    # Create labels
-    positive_labels = ["positive"] * len(positive_data)
-    negative_labels = ["negative"] * len(negative_data)
-
-    # Combine data
-    all_data = positive_data + negative_data
-    all_labels = positive_labels + negative_labels
-
-    # Initialize TfidfVectorizer
-    vectorizer = TfidfVectorizer(max_features=1000)
-    data_X = vectorizer.fit_transform(all_data)
-    data_Y = np.array(all_labels)
-
+ 
     # STEP 4: Create Feature Vectors and Assign Class Label for Training Data
     print("Generating the Feature Vectors ...")
     positive_sentiment = FeaturizeTrainingData(positive_data, "positive")
@@ -544,6 +558,13 @@ if __name__ == "__main__":
                 print("Accuracy: ", Accuracy)
                 evaluate_classifier(conf_mat)
 
+                yHat = classify_random_forest(data_X, data_Y, data_X)
+                conf_mat = confusion_matrix(data_Y, yHat)
+                print(conf_mat)
+                Accuracy = (sum(conf_mat.diagonal())) / np.sum(conf_mat)
+                print("Accuracy: ", Accuracy)
+                evaluate_classifier(conf_mat)
+
             elif args.Algorithm == "gnb":
                 yHat = classify_naive_bayes(data_X, data_Y, data_X)
                 conf_mat = confusion_matrix(data_Y, yHat)
@@ -560,6 +581,13 @@ if __name__ == "__main__":
                 evaluate_classifier(conf_mat)
             elif args.Algorithm == "maxEnt":
                 yHat = classify_maxEnt(data_X, data_Y, data_X)
+                conf_mat = confusion_matrix(data_Y, yHat)
+                print(conf_mat)
+                Accuracy = (sum(conf_mat.diagonal())) / np.sum(conf_mat)
+                print("Accuracy: ", Accuracy)
+                evaluate_classifier(conf_mat)
+            elif args.Algorithm == "rf":
+                yHat = classify_random_forest(data_X, data_Y, data_X)
                 conf_mat = confusion_matrix(data_Y, yHat)
                 print(conf_mat)
                 Accuracy = (sum(conf_mat.diagonal())) / np.sum(conf_mat)
@@ -624,6 +652,13 @@ if __name__ == "__main__":
                     evaluate_classifier(conf_mat)
                 elif args.Algorithm == "maxEnt":
                     yHat = classify_maxEnt(X_train, Y_train, X_test)
+                    conf_mat = confusion_matrix(Y_test, yHat)
+                    print(conf_mat)
+                    Accuracy = (sum(conf_mat.diagonal())) / np.sum(conf_mat)
+                    print("Accuracy: ", Accuracy)
+                    evaluate_classifier(conf_mat)
+                elif args.Algorithm == "rf":
+                    yHat = classify_random_forest(X_train, Y_train, X_test)
                     conf_mat = confusion_matrix(Y_test, yHat)
                     print(conf_mat)
                     Accuracy = (sum(conf_mat.diagonal())) / np.sum(conf_mat)
