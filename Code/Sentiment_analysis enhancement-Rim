@@ -5,7 +5,6 @@
     The below code uses different datasets, for Training purpose we have used the Rotten Tomatoes Movie Reviews
     In case of Testing we have used Twitter Dataset Reviews
 """
-
 import numpy as np
 import re
 import pandas as pd

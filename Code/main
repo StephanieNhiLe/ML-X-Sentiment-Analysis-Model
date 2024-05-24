@@ -1,0 +1,16 @@
+import praw
+
+
+reddit = praw.Reddit(
+    client_id="dpggItpTIl7DA_6EaKKC5g",
+    client_secret="DXJBIePIaXLU2Gpd-EpyaKoWc2AEeg",
+    user_agent="Movie-sentiment-analysis by u/FixNo6557",
+)
+
+subreddit = reddit.subreddit("Joker")
+
+top_posts = subreddit.top(limit=200)
+new_posts = subreddit.new(limit=200)
+
+for post in top_posts:
+    print(post.title)
