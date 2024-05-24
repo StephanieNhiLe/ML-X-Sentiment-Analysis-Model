@@ -12,5 +12,7 @@ subreddit = reddit.subreddit("Joker")
 top_posts = subreddit.top(limit=200)
 new_posts = subreddit.new(limit=200)
 
-for post in top_posts:
+for post in new_posts:
     print(post.title)
+    print("URL: ", post.url)
+    print("\n")
